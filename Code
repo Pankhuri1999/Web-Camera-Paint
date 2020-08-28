@@ -1,0 +1,169 @@
+import numpy as np
+import cv2
+from collections import deque
+
+# Define the upper and lower boundaries for yellow colour, which is to be detected
+
+
+lower = np.array([22, 93, 0])
+upper = np.array([45, 255, 255])
+
+
+# Defining a 5x5 kernel for erosion and dilation
+kernel = np.ones((5, 5), np.uint8)
+
+# Deques for various colours in distict arrays
+bpoints = [deque(maxlen=512)]
+ppoints = [deque(maxlen=512)]
+rpoints = [deque(maxlen=512)]
+wpoints = [deque(maxlen=512)]
+blpoints = [deque(maxlen=512)]
+bindex = 0
+gindex = 0
+rindex = 0
+yindex = 0
+blindex = 0
+
+colors = [(255, 165, 0), (165, 165, 255), (0, 0, 255), (255, 255, 255),(0,0,0)]
+
+index = 0
+
+# Paint interface code
+paintWindow = np.zeros((471,636,3)) + 255
+paintWindow = cv2.rectangle(paintWindow, (0,1), (100,65), (0,0,0), 2)
+paintWindow = cv2.rectangle(paintWindow, (101,1), (201,65), colors[0], -1)
+paintWindow = cv2.rectangle(paintWindow, (202,1), (302,65), colors[1], -1)
+paintWindow = cv2.rectangle(paintWindow, (303,1), (403,65), colors[2], -1)
+paintWindow = cv2.rectangle(paintWindow, (404,1), (504,65), colors[3], -1)
+paintWindow = cv2.rectangle(paintWindow, (505,1), (605,65), colors[3], -1)
+cv2.putText(paintWindow, "Erase", (10, 33), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 2, cv2.LINE_AA)
+cv2.putText(paintWindow, "Blue", (111, 33), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2, cv2.LINE_AA)
+cv2.putText(paintWindow, "Pink", (212, 33), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2, cv2.LINE_AA)
+cv2.putText(paintWindow, "Red", (313, 33), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2, cv2.LINE_AA)
+cv2.putText(paintWindow, "White", (414, 33), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2, cv2.LINE_AA)
+cv2.putText(paintWindow, "Black", (515, 33), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
+
+
+cv2.namedWindow('Paint', cv2.WINDOW_AUTOSIZE)
+
+camera = cv2.VideoCapture(0)
+
+
+while True:
+    
+    (grabbed, frame) = camera.read()
+    frame = cv2.flip(frame, 1)
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    # Putting different colouring options on frame
+    frame = cv2.rectangle(frame, (0,1), (100,65), (122,122,122), -1)
+    frame = cv2.rectangle(frame, (101,1), (201,65), colors[0], -1)
+    frame = cv2.rectangle(frame, (202,1), (302,65), colors[1], -1)
+    frame = cv2.rectangle(frame, (303,1), (403,65), colors[2], -1)
+    frame = cv2.rectangle(frame, (404,1), (504,65), colors[3], -1)
+    frame = cv2.rectangle(frame, (505,1), (605,65), colors[4], -1)
+    cv2.putText(frame, "Erase", (10, 33), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(frame, "Blue", (111, 33), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(frame, "Pink", (212, 33), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(frame, "Red", (313, 33), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(frame, "White", (414, 33), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150,150,150), 2, cv2.LINE_AA)
+    cv2.putText(frame, "Black", (515, 33), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150,150,150), 2, cv2.LINE_AA)
+
+    # If-else statement to check if we have reached the end of the video
+    if not grabbed:
+        break
+
+    # Determining which pixels fall within the boundaries and then blurring the binary image
+    mask = cv2.inRange(hsv, lower, upper)
+    mask = cv2.erode(mask, kernel, iterations=2)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.dilate(mask, kernel, iterations=1)
+
+    # Looking for contours in image
+    ( cnts, _) = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE)
+    center = None
+
+    # Code to see if any contours were found
+    if len(cnts) > 0:
+        # Sorting the contours and find the largest one
+        # will assume this contour correspondes to the area of our specified colour(colour to be detected, in our case it is yellow)
+        cnt = sorted(cnts, key = cv2.contourArea, reverse = True)[0]
+        # Get the radius of the enclosing circle around the found contour
+        ((x, y), radius) = cv2.minEnclosingCircle(cnt)
+        # Draw the circle around the contour
+        cv2.circle(frame, (int(x), int(y)), int(radius), (0, 255, 255), 2)
+        # Get the moments to calculate the center of the contour (in this case Circle)
+        M = cv2.moments(cnt)
+        center = (int(M['m10'] / M['m00']), int(M['m01'] / M['m00']))
+
+        if center[1] <= 65:
+            if 0 <= center[0] <= 100: # Erase
+                bpoints = [deque(maxlen=512)]
+                ppoints = [deque(maxlen=512)]
+                rpoints = [deque(maxlen=512)]
+                wpoints = [deque(maxlen=512)]
+                blpoints = [deque(maxlen=512)]
+
+                bindex = 0
+                gindex = 0
+                rindex = 0
+                yindex = 0
+                blindex = 0
+
+                paintWindow[67:,:,:] = 255
+            elif 101 <= center[0] <= 201:
+                    index = 0 # Blue
+            elif 202 <= center[0] <= 302:
+                    index = 1 # Pink
+            elif 303 <= center[0] <= 403:
+                    index = 2 # Red
+            elif 404 <= center[0] <= 504:
+                    index = 3 # White
+            elif 505 <= center[0] <= 605:
+                    index = 4  #Black
+        else :
+            if index == 0:
+                bpoints[bindex].appendleft(center)
+            elif index == 1:
+                ppoints[gindex].appendleft(center)
+            elif index == 2:
+                rpoints[rindex].appendleft(center)
+            elif index == 3:
+                wpoints[yindex].appendleft(center)
+            elif index == 4:
+                blpoints[blindex].appendleft(center)
+
+    else:
+        bpoints.append(deque(maxlen=512))
+        bindex += 1
+        ppoints.append(deque(maxlen=512))
+        gindex += 1
+        rpoints.append(deque(maxlen=512))
+        rindex += 1
+        wpoints.append(deque(maxlen=512))
+        yindex += 1
+        blpoints.append(deque(maxlen=512))
+        blindex += 1
+
+    # Draw lines of all the colours (Blue, Pink, Red , White and Black )
+    points = [bpoints, ppoints, rpoints, wpoints, blpoints]
+    for i in range(len(points)):
+        for j in range(len(points[i])):
+            for k in range(1, len(points[i][j])):
+                if points[i][j][k - 1] is None or points[i][j][k] is None:
+                    continue
+                cv2.line(frame, points[i][j][k - 1], points[i][j][k], colors[i], 2)
+                cv2.line(paintWindow, points[i][j][k - 1], points[i][j][k], colors[i], 2)
+
+    # Show the frame and the paintWindow image
+    cv2.imshow("Tracking", frame)
+    cv2.imshow("Paint", paintWindow)
+
+    # Press 't' button to exitfrom the paint interface window
+    if cv2.waitKey(1) & 0xFF == ord("t"):
+        break
+
+# Cleanup the camera and close any open windows
+camera.release()
+cv2.destroyAllWindows()
